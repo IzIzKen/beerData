@@ -15,28 +15,31 @@ chrome_service = fs.Service(executable_path=chromeDriver)
 driver = webdriver.Chrome(service=chrome_service, options=chromeOptions)
 wait = WebDriverWait(driver=driver, timeout=60)
 
-# 次のページへの画像src属性の値
-next_page_src = "http://www.beer365.net/images/pagernext_red.png"
-
 driver.get('http://www.beer365.net/rankings/')
 wait.until(EC.presence_of_element_located)
 time.sleep(1)
 
 id = 1
-outputs = ['id', 'name', 'img_src', 'evaluation', 'looks', 'smell', 'taste', 'throat', 'total', 'style', 'ABV', 'IBU', 'brewery', 'description']
-beer_images = []
+header = ['id', 'name', 'name_en', 'img_src', 'evaluation', 'looks', 'smell', 'taste', 'throat', 'total', 'style', 'ABV', 'IBU', 'brewery', 'description']
+outputs = []
+urls = []
 
 pages = driver.find_element(By.CLASS_NAME, 'pager').find_elements(By.TAG_NAME, 'span')
+for page in range(0, len(pages)):
+    page_btns = driver.find_element(By.CLASS_NAME, 'pager').find_elements(By.TAG_NAME, 'a')
+    next_page_href = page_btns[-1].get_attribute("href")
 
-for page in pages:
-    i = 1
     beer_names = driver.find_element(By.TAG_NAME, 'table').find_elements(By.TAG_NAME, 'a')
+    urls.clear()
     for beer_name in beer_names:
-        beer_names_in_loop = driver.find_element(By.TAG_NAME, 'table').find_elements(By.TAG_NAME, 'a')
-        beer_names_in_loop[i - 1].click()
+        urls.append(beer_name.get_attribute("href"))
+
+    for url in urls:
+        driver.get(url)
         wait.until(EC.presence_of_element_located)
         time.sleep(1)
         name = driver.find_element(By.CLASS_NAME, 'detail').text
+        names = name.splitlines()
         img = driver.find_element(By.XPATH, '//*[@id="mainlowcol"]/div[2]/div/div[1]/p/img')
         img_src = img.get_attribute("src")
         ratebox = driver.find_element(By.CLASS_NAME, 'ratebox')
@@ -52,32 +55,28 @@ for page in pages:
         IBU = driver.find_elements(By.TAG_NAME, 'td')[2].text
         brewery = driver.find_elements(By.TAG_NAME, 'td')[3].text
         description = driver.find_element(By.CLASS_NAME, 'mb20').text
-        row = [id, name, img_src, evaluation, looks, smell, taste, throat, total, style, ABV, IBU, brewery, description]
-        outputs.append(row)
+
+        if len(names) < 2:
+            names.append('')
         png = img.screenshot_as_png
-        img_name = name + '.png'
-        with open(name + '.png', "wb") as f:
+        path = 'beerImages/' + names[0] + '.png'
+        with open(path, "wb") as f:
             f.write(png)
-        print(id, name, img_src, evaluation, looks, smell, taste, throat, total, style, ABV, IBU, brewery, description)
-        i += 1
+
+        row = [id, names[0], names[1], img_src, evaluation, looks, smell, taste, throat, total, style, ABV, IBU, brewery, description]
+        outputs.append(row)
+        # print(id, names[0], names[1], img_src, evaluation, looks, smell, taste, throat, total, style, ABV, IBU, brewery, description)
         id += 1
-        driver.back()
-        wait.until(EC.presence_of_element_located)
-        time.sleep(1)
-        break
-    pager = driver.find_element(By.CLASS_NAME, 'pager')
-    page_btns = pager.find_elements(By.TAG_NAME, 'a')
-    page_btns[-1].click()
-    break
+
+    driver.get(next_page_href)
+    wait.until(EC.presence_of_element_located)
+    time.sleep(1)
 
 driver.close()
 driver.quit()
 
 # shift-jis, utf8, cp932
-# with open(f"beersDatabase.csv", "w", newline="", encoding="utf8") as f:
-#     writer = csv.writer(f)
-#     writer.writerows(outputs)
-# for beer_image in beer_images:
-#     png = beer_image.screenshot_as_png
-#     with open('beerImages', "wb") as f:
-#         f.write(png)
+with open(f"beersDatabase.csv", "w", newline="", encoding="utf8") as f:
+    writer = csv.writer(f)
+    writer.writerow(header)
+    writer.writerows(outputs)
